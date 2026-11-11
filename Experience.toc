@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Experience
+## Notes: Standalone experience bar addon for World of Warcraft: Forever.
+## Version: 0.1.0
+## SavedVariablesPerCharacter: ExperienceDB
+
+Experience.lua
