@@ -4,4 +4,5 @@
 ## Version: 0.1.0
 ## SavedVariablesPerCharacter: ExperienceDB
 
+NativeBar.lua
 Experience.lua

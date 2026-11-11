@@ -13,7 +13,12 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
     addon.db = ExperienceDB
 
     SLASH_EXPERIENCE1 = "/experience"
-    SlashCmdList.EXPERIENCE = function()
+    SlashCmdList.EXPERIENCE = function(message)
+        if message:lower():match("^%s*bar%s*$") then
+            addon:PrintBarStatus()
+            return
+        end
+
         local version, build, _, interfaceVersion = GetBuildInfo()
         print(string.format("%s: bootstrap loaded. Client %s (build %s), interface %s.", addonName, version, build, tostring(interfaceVersion)))
     end
