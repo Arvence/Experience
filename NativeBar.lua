@@ -3,6 +3,7 @@ local entries = {}
 local events = CreateFrame("Frame")
 local initializationIssue = "waiting for player login"
 local fillTexture = "Interface\\TargetingFrame\\UI-StatusBar"
+local roundedMask = "Interface\\AddOns\\Experience\\Media\\RoundedBarMask.png"
 
 local function SuppressNativeAlpha(entry)
     if entry.active and entry.native:GetAlpha() ~= 0 then
@@ -45,6 +46,7 @@ local function UpdateDivisions(entry)
             divider = entry.fill:CreateTexture(nil, "OVERLAY")
             divider:SetAtlas("ui-hud-experiencebar-divider")
             divider:SetWidth(3)
+            divider:SetAlpha(0.45)
             entry.divisions[index] = divider
         end
 
@@ -60,16 +62,51 @@ local function UpdateDivisions(entry)
     end
 end
 
+local function PlaceSegment(texture, fill, startXP, amount, maximum, width)
+    if amount <= 0 then
+        texture:Hide()
+        return
+    end
+
+    local offset = width * startXP / maximum
+    texture:ClearAllPoints()
+    texture:SetPoint("TOPLEFT", fill, "TOPLEFT", offset, 0)
+    texture:SetPoint("BOTTOMLEFT", fill, "BOTTOMLEFT", offset, 0)
+    texture:SetWidth(width * amount / maximum)
+    texture:Show()
+end
+
+local function UpdateSegments(entry)
+    local data = addon.xpData
+    if not data.current or not data.maximum then
+        entry.questPreview:Hide()
+        entry.restedPreview:Hide()
+        return
+    end
+
+    local maximum = data.maximum
+    local current = math.min(data.current, maximum)
+    local available = maximum - current
+    local quest = math.min(data.questKnownXP, available)
+    local rested = math.min(data.restedXP or 0, available - quest)
+    local width = entry.fill:GetWidth()
+
+    PlaceSegment(entry.questPreview, entry.fill, current, quest, maximum, width)
+    PlaceSegment(entry.restedPreview, entry.fill, current + quest, rested, maximum, width)
+end
+
 local function UpdateLayout(entry)
-    entry.bar:SetHeight(entry.native.StatusBar:GetHeight() + 1)
+    entry.bar:SetHeight(entry.native.StatusBar:GetHeight() + 3)
     UpdateDivisions(entry)
+    UpdateSegments(entry)
 end
 
 local function UpdateXP(entry)
-    local current = UnitXP("player")
-    local maximum = UnitXPMax("player")
+    local data = addon.xpData
+    local current = data.current
+    local maximum = data.maximum
 
-    if issecretvalue(current) or issecretvalue(maximum) or type(current) ~= "number" or type(maximum) ~= "number" or maximum <= 0 then
+    if not current or not maximum then
         entry.dataAvailable = false
         SetActive(entry, false)
         return
@@ -78,6 +115,7 @@ local function UpdateXP(entry)
     entry.dataAvailable = true
     entry.fill:SetMinMaxValues(0, maximum)
     entry.fill:SetValue(math.min(math.max(current, 0), maximum))
+    UpdateSegments(entry)
     SetActive(entry, entry.native:IsShown() and GameRulesUtil.CanShowExperienceBar())
 end
 
@@ -93,31 +131,58 @@ local function CreateEntry(container, native)
 
     local border = bar:CreateTexture(nil, "BACKGROUND")
     border:SetAllPoints()
-    border:SetColorTexture(0.38, 0.31, 0.19, 1)
+    border:SetTexture(fillTexture)
+    border:SetVertexColor(0.84, 0.69, 0.44, 1)
+
+    local borderMask = bar:CreateMaskTexture()
+    borderMask:SetAllPoints()
+    borderMask:SetTexture(roundedMask)
+    border:AddMaskTexture(borderMask)
 
     local fill = CreateFrame("StatusBar", nil, bar)
     fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 1, -1)
     fill:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -1, 1)
     fill:SetStatusBarTexture(fillTexture)
-    fill:SetStatusBarColor(0.58, 0.14, 0.78, 1)
+    fill:SetStatusBarColor(0.62, 0.37, 0.90, 1)
     fill:EnableMouse(false)
 
     local background = fill:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
     background:SetTexture(fillTexture)
-    background:SetVertexColor(0.08, 0.065, 0.10, 1)
+    background:SetVertexColor(0.04, 0.055, 0.11, 1)
 
     local highlight = fill:CreateTexture(nil, "OVERLAY")
     highlight:SetPoint("TOPLEFT")
     highlight:SetPoint("TOPRIGHT")
     highlight:SetHeight(1)
-    highlight:SetColorTexture(1, 1, 1, 0.12)
+    highlight:SetColorTexture(1, 1, 1, 0.04)
+
+    local fillMask = fill:CreateMaskTexture()
+    fillMask:SetAllPoints()
+    fillMask:SetTexture(roundedMask)
+    fill:GetStatusBarTexture():AddMaskTexture(fillMask)
+    background:AddMaskTexture(fillMask)
+    highlight:AddMaskTexture(fillMask)
+
+    local questPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
+    questPreview:SetTexture(fillTexture)
+    questPreview:SetVertexColor(0.54, 0.41, 0.18, 1)
+    questPreview:AddMaskTexture(fillMask)
+    questPreview:Hide()
+
+    local restedPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
+    restedPreview:SetTexture(fillTexture)
+    restedPreview:SetVertexColor(0.25, 0.30, 0.41, 1)
+    restedPreview:AddMaskTexture(fillMask)
+    restedPreview:Hide()
 
     local entry = {
         container = container,
         native = native,
         bar = bar,
         fill = fill,
+        questPreview = questPreview,
+        restedPreview = restedPreview,
         nativeAlpha = native:GetAlpha(),
         borderAlpha = container.BarFrameTexture:GetAlpha(),
         nativeMouse = native:IsMouseEnabled(),
@@ -128,6 +193,7 @@ local function CreateEntry(container, native)
 
     bar:SetScript("OnSizeChanged", function()
         UpdateDivisions(entry)
+        UpdateSegments(entry)
     end)
 
     native.StatusBar:HookScript("OnSizeChanged", function()
@@ -147,6 +213,7 @@ local function CreateEntry(container, native)
     end)
 
     hooksecurefunc(native, "Update", function()
+        addon:RefreshProgressData()
         UpdateXP(entry)
     end)
 
@@ -197,12 +264,21 @@ local function Initialize()
         end
     end
 
+    addon:RefreshProgressData()
+    addon:RefreshQuestData()
+
     for _, container in ipairs(manager.barContainers) do
         entries[#entries + 1] = CreateEntry(container, container.bars[experienceIndex])
     end
 
     initializationIssue = nil
     events:UnregisterAllEvents()
+end
+
+function addon:RefreshBars()
+    for _, entry in ipairs(entries) do
+        UpdateXP(entry)
+    end
 end
 
 function addon:PrintBarStatus()
