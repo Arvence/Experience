@@ -24,6 +24,11 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
             return
         end
 
+        if message:lower():match("^%s*text%s*$") then
+            addon:PrintTextStatus()
+            return
+        end
+
         local version, build, _, interfaceVersion = GetBuildInfo()
         print(string.format("%s: bootstrap loaded. Client %s (build %s), interface %s.", addonName, version, build, tostring(interfaceVersion)))
     end

@@ -30,6 +30,9 @@ local function SetActive(entry, active)
         entry.native:EnableMouse(not active and entry.nativeMouse)
         entry.native.ExhaustionTick:EnableMouse(not active and entry.tickMouse)
         entry.bar:SetShown(active)
+        if not active then
+            addon:HideTooltip(entry)
+        end
     end
 
     SuppressNativeAlpha(entry)
@@ -99,6 +102,7 @@ local function UpdateLayout(entry)
     entry.bar:SetHeight(entry.native.StatusBar:GetHeight() + 3)
     UpdateDivisions(entry)
     UpdateSegments(entry)
+    addon:UpdateBarText(entry)
 end
 
 local function UpdateXP(entry)
@@ -116,7 +120,9 @@ local function UpdateXP(entry)
     entry.fill:SetMinMaxValues(0, maximum)
     entry.fill:SetValue(math.min(math.max(current, 0), maximum))
     UpdateSegments(entry)
+    addon:UpdateBarText(entry)
     SetActive(entry, entry.native:IsShown() and GameRulesUtil.CanShowExperienceBar())
+    addon:UpdateTooltip(entry)
 end
 
 local function CreateEntry(container, native)
@@ -191,9 +197,13 @@ local function CreateEntry(container, native)
         divisions = {},
     }
 
+    addon:CreateBarText(entry)
+    addon:AttachTooltip(entry)
+
     bar:SetScript("OnSizeChanged", function()
         UpdateDivisions(entry)
         UpdateSegments(entry)
+        addon:UpdateBarText(entry)
     end)
 
     native.StatusBar:HookScript("OnSizeChanged", function()
@@ -300,6 +310,14 @@ function addon:PrintBarStatus()
         local state = string.format("visible %s, native alpha %.2f, XP data %s", tostring(entry.bar:IsVisible()), entry.native:GetAlpha(), entry.dataAvailable and "available" or "unavailable")
         print(string.format("Experience: container %d, %s, %s, %s.", index, dimensions, alignment, state))
     end
+end
+
+function addon:PrintTextStatus()
+    if initializationIssue then
+        print("Experience: " .. initializationIssue .. ".")
+        return
+    end
+    self:PrintTextStatusEntries(entries)
 end
 
 events:SetScript("OnEvent", function(_, event, loadedAddonName)

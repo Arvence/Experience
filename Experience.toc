@@ -5,5 +5,7 @@
 ## SavedVariablesPerCharacter: ExperienceDB
 
 XPData.lua
+BarText.lua
+Tooltip.lua
 NativeBar.lua
 Experience.lua
