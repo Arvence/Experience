@@ -83,6 +83,7 @@ local function UpdateSegments(entry)
     local data = addon.xpData
     if not data.current or not data.maximum then
         entry.questPreview:Hide()
+        entry.questBonusPreview:Hide()
         entry.restedPreview:Hide()
         return
     end
@@ -90,16 +91,19 @@ local function UpdateSegments(entry)
     local maximum = data.maximum
     local current = math.min(data.current, maximum)
     local available = maximum - current
-    local quest = math.min(data.questKnownXP, available)
-    local rested = math.min(data.restedXP or 0, available - quest)
+    local quest = math.min(data.questKnownXP or 0, available)
+    local afterQuest = available - quest
+    local questBonus = math.min(data.questKnownBonusXP or 0, afterQuest)
+    local rested = math.min(data.restedXP or 0, afterQuest - questBonus)
     local width = entry.fill:GetWidth()
 
     PlaceSegment(entry.questPreview, entry.fill, current, quest, maximum, width)
-    PlaceSegment(entry.restedPreview, entry.fill, current + quest, rested, maximum, width)
+    PlaceSegment(entry.questBonusPreview, entry.fill, current + quest, questBonus, maximum, width)
+    PlaceSegment(entry.restedPreview, entry.fill, current + quest + questBonus, rested, maximum, width)
 end
 
 local function UpdateLayout(entry)
-    entry.bar:SetHeight(entry.native.StatusBar:GetHeight() + 3)
+    entry.bar:SetHeight(entry.native.StatusBar:GetHeight() + 6)
     UpdateDivisions(entry)
     UpdateSegments(entry)
     addon:UpdateBarText(entry)
@@ -131,14 +135,14 @@ local function CreateEntry(container, native)
     bar:SetIgnoreParentAlpha(true)
     bar:SetFrameStrata(native.OverlayFrame:GetFrameStrata())
     bar:SetFrameLevel(math.max(native.OverlayFrame:GetFrameLevel(), native.ExhaustionTick:GetFrameLevel()) + 1)
-    bar:SetPoint("LEFT", native.StatusBar, "LEFT", 0, 0)
-    bar:SetPoint("RIGHT", native.StatusBar, "RIGHT", 0, 0)
+    bar:SetPoint("BOTTOMLEFT", native.StatusBar, "BOTTOMLEFT", 0, -1.5)
+    bar:SetPoint("BOTTOMRIGHT", native.StatusBar, "BOTTOMRIGHT", 0, -1.5)
     bar:EnableMouse(true)
 
     local border = bar:CreateTexture(nil, "BACKGROUND")
     border:SetAllPoints()
     border:SetTexture(fillTexture)
-    border:SetVertexColor(0.84, 0.69, 0.44, 1)
+    border:SetVertexColor(0.87, 0.72, 0.47, 1)
 
     local borderMask = bar:CreateMaskTexture()
     borderMask:SetAllPoints()
@@ -146,8 +150,8 @@ local function CreateEntry(container, native)
     border:AddMaskTexture(borderMask)
 
     local fill = CreateFrame("StatusBar", nil, bar)
-    fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 1, -1)
-    fill:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -1, 1)
+    fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 2, -2)
+    fill:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 2)
     fill:SetStatusBarTexture(fillTexture)
     fill:SetStatusBarColor(0.62, 0.37, 0.90, 1)
     fill:EnableMouse(false)
@@ -172,13 +176,19 @@ local function CreateEntry(container, native)
 
     local questPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
     questPreview:SetTexture(fillTexture)
-    questPreview:SetVertexColor(0.54, 0.41, 0.18, 1)
+    questPreview:SetVertexColor(0.68, 0.56, 0.27, 1)
     questPreview:AddMaskTexture(fillMask)
     questPreview:Hide()
 
+    local questBonusPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
+    questBonusPreview:SetTexture(fillTexture)
+    questBonusPreview:SetVertexColor(0.611765, 0.458824, 0.094118, 1)
+    questBonusPreview:AddMaskTexture(fillMask)
+    questBonusPreview:Hide()
+
     local restedPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
     restedPreview:SetTexture(fillTexture)
-    restedPreview:SetVertexColor(0.25, 0.30, 0.41, 1)
+    restedPreview:SetVertexColor(0.51, 0.62, 0.74, 1)
     restedPreview:AddMaskTexture(fillMask)
     restedPreview:Hide()
 
@@ -188,6 +198,7 @@ local function CreateEntry(container, native)
         bar = bar,
         fill = fill,
         questPreview = questPreview,
+        questBonusPreview = questBonusPreview,
         restedPreview = restedPreview,
         nativeAlpha = native:GetAlpha(),
         borderAlpha = container.BarFrameTexture:GetAlpha(),

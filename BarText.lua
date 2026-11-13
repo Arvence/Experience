@@ -2,7 +2,7 @@ local _, addon = ...
 local separator = "  ·  "
 local dash = "—"
 local referenceFontSize = 11
-local labelColor = CreateColor(0.95, 0.85, 0.08)
+local labelColor = CreateColor(0.68, 0.56, 0.27)
 local valueColor = CreateColor(0.93, 0.93, 0.95)
 local separatorColor = CreateColor(0.55, 0.45, 0.26)
 
@@ -23,6 +23,20 @@ local function Number(value, compact)
     return BreakUpLargeNumbers(value)
 end
 
+local function Percentage(value)
+    if value == nil then
+        return dash
+    end
+    return string.format("%.0f%%", value)
+end
+
+local function ProjectedPercentage(value)
+    if value == nil then
+        return dash
+    end
+    return string.format("%.2f%%", value)
+end
+
 local function Segment(label, value, colored)
     if colored then
         return labelColor:WrapTextInColorCode(label) .. " " .. valueColor:WrapTextInColorCode(value)
@@ -31,23 +45,40 @@ local function Segment(label, value, colored)
 end
 
 local function FormatLine(data, compact, colored)
+    local remaining = Number(data.remaining, compact)
+    if data.remaining ~= nil and data.maximum and data.maximum > 0 then
+        remaining = remaining .. " (" .. Percentage(data.remaining / data.maximum * 100) .. ")"
+    end
+
     local parts
     if compact then
         parts = {
             Segment("XP", Number(data.current, true) .. "/" .. Number(data.maximum, true), colored),
-            Segment("Left", Number(data.remaining, true), colored),
-            Segment("XP/h", dash, colored),
-            Segment("Lvl in", dash, colored),
+            Segment("Left", remaining, colored),
+            Segment("Quests", Percentage(data.questPercent) .. " - " .. ProjectedPercentage(data.questProjectedPercent), colored),
+            Segment("Rested", Percentage(data.restedPercent), colored),
         }
     else
         parts = {
             Segment("XP", Number(data.current) .. " / " .. Number(data.maximum), colored),
-            Segment("Left", Number(data.remaining), colored),
-            Segment("XP/h", dash, colored),
-            Segment("Level up in", dash, colored),
+            Segment("Left", remaining, colored),
+            Segment("Quests", Percentage(data.questPercent) .. " - " .. ProjectedPercentage(data.questProjectedPercent), colored),
+            Segment("Rested", Percentage(data.restedPercent), colored),
         }
     end
     return table.concat(parts, colored and separatorColor:WrapTextInColorCode(separator) or separator)
+end
+
+local function PixelAlignedCenterOffset(frame)
+    local x, y = frame:GetCenter()
+    local scale = frame:GetEffectiveScale()
+    if not x or not y or not scale or scale <= 0 then
+        return 0, 0
+    end
+
+    local pixelSize = 1 / scale
+    return math.floor(x / pixelSize + 0.5) * pixelSize - x,
+        math.floor(y / pixelSize + 0.5) * pixelSize - y
 end
 
 function addon:CreateBarText(entry)
@@ -71,9 +102,10 @@ function addon:CreateBarText(entry)
     measure:SetAlpha(0)
     entry.textMeasure = measure
 
-    local font, _, flags = entry.native.OverlayFrame.Text:GetFont()
+    local font, fontSize, flags = entry.native.OverlayFrame.Text:GetFont()
     entry.textFont = font
-    entry.textSize = referenceFontSize
+    entry.nativeTextSize = fontSize or referenceFontSize
+    entry.textSize = entry.nativeTextSize + 1
     entry.textFlags = flags
     self:UpdateBarText(entry)
 end
@@ -105,6 +137,12 @@ function addon:UpdateBarText(entry)
         width = measure:GetStringWidth()
     end
 
+    while width > available and fontSize > 9 do
+        fontSize = fontSize - 1
+        measure:SetFont(entry.textFont, fontSize, entry.textFlags)
+        width = measure:GetStringWidth()
+    end
+
     entry.text:SetFont(entry.textFont, fontSize, entry.textFlags)
     entry.text:SetWidth(math.min(available, math.ceil(width) + 4))
     entry.textFit = width <= available
@@ -116,7 +154,8 @@ function addon:UpdateBarText(entry)
     local textHeight = entry.text:GetStringHeight()
     entry.text:SetHeight(textHeight)
     entry.text:ClearAllPoints()
-    entry.text:SetPoint("TOP", entry.textOverlay, "TOP", 0, -(entry.bar:GetHeight() - textHeight) / 2)
+    local xOffset, yOffset = PixelAlignedCenterOffset(entry.fill)
+    entry.text:SetPoint("CENTER", entry.fill, "CENTER", xOffset, yOffset)
 end
 
 function addon:PrintTextStatusEntries(entries)

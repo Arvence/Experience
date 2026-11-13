@@ -43,6 +43,8 @@ function addon:RefreshProgressData()
 
     data.restedPercent = data.maximum and data.restedXP and data.restedXP / data.maximum * 100 or nil
     data.questPercent = data.maximum and data.questXP and data.questXP / data.maximum * 100 or nil
+    data.questBonusPercent = data.maximum and data.questBonusXP and data.questBonusXP / data.maximum * 100 or nil
+    data.questProjectedPercent = data.maximum and data.questProjectedXP and data.questProjectedXP / data.maximum * 100 or nil
 end
 
 function addon:RefreshQuestData()
@@ -50,6 +52,7 @@ function addon:RefreshQuestData()
     local quests = {}
     local unknownQuestIDs = {}
     local knownXP = 0
+    local knownBonusXP = 0
     local knownCount = 0
     local unknownCount = 0
     local observed = 0
@@ -93,13 +96,19 @@ function addon:RefreshQuestData()
                                 end
                             end
 
-                            quests[#quests + 1] = { id = questID, name = title, xp = reward }
+                            local bonusXP = nil
+                            if IsNumber(reward) and reward >= 0 then
+                                bonusXP = reward * 0.03
+                            end
+
+                            quests[#quests + 1] = { id = questID, name = title, xp = reward, bonusXP = bonusXP }
                             if reward == nil then
                                 unknownCount = unknownCount + 1
                                 unknownQuestIDs[questID] = true
                             else
                                 knownCount = knownCount + 1
                                 knownXP = knownXP + reward
+                                knownBonusXP = knownBonusXP + (bonusXP or 0)
                             end
                         end
                     end
@@ -115,12 +124,17 @@ function addon:RefreshQuestData()
     data.quests = quests
     data.questCount = #quests
     data.questKnownXP = knownXP
+    data.questKnownBonusXP = knownBonusXP
     data.questKnownCount = knownCount
     data.questUnknownCount = unknownCount
     data.questLogComplete = complete
     data.unknownQuestIDs = unknownQuestIDs
     data.questXP = (knownCount > 0 or (#quests == 0 and complete)) and knownXP or nil
+    data.questBonusXP = (knownCount > 0 or (#quests == 0 and complete)) and knownBonusXP or nil
+    data.questProjectedXP = data.questXP and data.questBonusXP and data.questXP + data.questBonusXP or nil
     data.questPercent = data.maximum and data.questXP and data.questXP / data.maximum * 100 or nil
+    data.questBonusPercent = data.maximum and data.questBonusXP and data.questBonusXP / data.maximum * 100 or nil
+    data.questProjectedPercent = data.maximum and data.questProjectedXP and data.questProjectedXP / data.maximum * 100 or nil
     data.questPercentPartial = not complete or unknownCount > 0
 end
 
@@ -130,13 +144,15 @@ function addon:PrintDataStatus()
     local maximum = data.maximum and tostring(data.maximum) or "unavailable"
     local rested = data.restedXP and tostring(data.restedXP) or "unavailable"
     local questTotal = data.questXP and tostring(data.questXP) or "unavailable"
+    local questBonusTotal = data.questBonusXP and tostring(data.questBonusXP) or "unavailable"
     local logState = data.questLogComplete and "complete" or "partial"
 
     print(string.format("Experience: XP %s / %s, remaining %s, rested bonus %s.", current, maximum, data.remaining and tostring(data.remaining) or "unavailable", rested))
-    print(string.format("Experience: completed quests %d observed, known XP %d from %d, unknown rewards %d, quest preview XP %s, log %s.", data.questCount, data.questKnownXP, data.questKnownCount, data.questUnknownCount, questTotal, logState))
+    print(string.format("Experience: completed quests %d observed, known XP %d from %d, bonus XP %s, unknown rewards %d, quest preview XP %s, log %s.", data.questCount, data.questKnownXP, data.questKnownCount, questBonusTotal, data.questUnknownCount, questTotal, logState))
 
     for _, quest in ipairs(data.quests) do
-        print(string.format("Experience: quest %d — %s: %s XP.", quest.id, quest.name or "name unavailable", quest.xp and tostring(quest.xp) or "unavailable"))
+        local bonus = quest.bonusXP and tostring(quest.bonusXP) or "unavailable"
+        print(string.format("Experience: quest %d — %s: %s XP (%s bonus XP).", quest.id, quest.name or "name unavailable", quest.xp and tostring(quest.xp) or "unavailable", bonus))
     end
 end
 
