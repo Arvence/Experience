@@ -6,12 +6,6 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         return
     end
 
-    if type(ExperienceDB) ~= "table" then
-        ExperienceDB = {}
-    end
-
-    addon.db = ExperienceDB
-
     SLASH_EXPERIENCE1 = "/experience"
     SlashCmdList.EXPERIENCE = function(message)
         if message:lower():match("^%s*bar%s*$") then
