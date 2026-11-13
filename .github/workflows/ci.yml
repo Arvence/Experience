@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lua syntax and addon metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+
+      - name: Check Lua syntax
+        shell: bash
+        run: |
+          mapfile -d '' files < <(find . -type f -name '*.lua' -print0)
+          if ((${#files[@]} == 0)); then
+            echo "No Lua source files found."
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            luac5.1 -p "$file"
+          done
+
+      - name: Check addon metadata and TOC files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          toc = root / "Experience.toc"
+          if root.name != "Experience":
+              sys.exit(f"Expected addon folder 'Experience', found '{root.name}'.")
+          if not toc.is_file():
+              sys.exit("Experience.toc is missing.")
+
+          metadata = {}
+          referenced_files = []
+          for raw_line in toc.read_text(encoding="utf-8-sig").splitlines():
+              line = raw_line.strip()
+              if not line:
+                  continue
+              if line.startswith("##"):
+                  key, separator, value = line[2:].partition(":")
+                  if separator:
+                      metadata[key.strip()] = value.strip()
+                  continue
+              if line.startswith("#"):
+                  continue
+              referenced_files.append(line)
+
+          if metadata.get("Title") != "Experience":
+              sys.exit("Experience.toc title must be 'Experience'.")
+          if not metadata.get("Interface", "").isdigit():
+              sys.exit("Experience.toc must define a numeric Interface version.")
+          if not metadata.get("Version"):
+              sys.exit("Experience.toc must define a Version.")
+          if not referenced_files:
+              sys.exit("Experience.toc does not reference any addon files.")
+
+          missing = [name for name in referenced_files if not (root / name).is_file()]
+          if missing:
+              sys.exit("Missing TOC file(s): " + ", ".join(missing))
+
+          required_order = ["XPData.lua", "BarText.lua", "Tooltip.lua", "NativeBar.lua", "Experience.lua"]
+          positions = [referenced_files.index(name) if name in referenced_files else -1 for name in required_order]
+          if -1 in positions or positions != sorted(positions):
+              sys.exit("Experience.toc must load XPData, BarText, Tooltip, NativeBar, then Experience.")
+
+          print(f"Validated addon metadata, {len(referenced_files)} TOC file references, and Lua load order.")
+          PY
