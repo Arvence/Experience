@@ -78,7 +78,7 @@ local function PixelAlignedCenterOffset(frame)
 
     local pixelSize = 1 / scale
     return math.floor(x / pixelSize + 0.5) * pixelSize - x,
-        math.floor(y / pixelSize + 0.5) * pixelSize - y
+        math.floor(y / pixelSize + 0.5) * pixelSize - y - pixelSize * 0.5
 end
 
 function addon:CreateBarText(entry)
