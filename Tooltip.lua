@@ -12,6 +12,37 @@ local function Value(value)
     return value == nil and dash or BreakUpLargeNumbers(value)
 end
 
+local function BonusValue(value)
+    local cents = math.floor(value * 100 + 0.5)
+    local whole = math.floor(cents / 100)
+    local fraction = cents % 100
+    if fraction == 0 then
+        return Value(whole)
+    end
+    if fraction % 10 == 0 then
+        return Value(whole) .. string.format(".%d", fraction / 10)
+    end
+    return Value(whole) .. string.format(".%02d", fraction)
+end
+
+local function QuestXPValue(xp, bonusXP)
+    if xp == nil then
+        return dash
+    end
+    return Value(xp) .. " XP (|cff9c7518+" .. BonusValue(bonusXP or 0) .. " XP|r)"
+end
+
+local function RestedXPValue(xp, percent)
+    if xp == nil then
+        return dash
+    end
+    local text = Value(xp) .. " XP"
+    if percent ~= nil then
+        text = text .. " (" .. string.format("%.2f%%", percent) .. ")"
+    end
+    return text
+end
+
 local function NewText(parent, template, justify)
     local text = parent:CreateFontString(nil, "OVERLAY", template)
     text:SetJustifyH(justify or "LEFT")
@@ -78,16 +109,11 @@ local function CreateTooltip()
 
     tooltip.experienceHeading = NewText(tooltip, "GameFontNormalSmall")
     tooltip.questHeading = NewText(tooltip, "GameFontNormalSmall")
-    tooltip.sessionHeading = NewText(tooltip, "GameFontNormalSmall")
     tooltip.progress = NewRow(tooltip)
     tooltip.remaining = NewRow(tooltip)
     tooltip.questSummary = NewRow(tooltip)
     tooltip.rested = NewRow(tooltip)
     tooltip.unknown = NewRow(tooltip)
-    tooltip.sessionXP = NewRow(tooltip)
-    tooltip.sessionTime = NewRow(tooltip)
-    tooltip.sessionRate = NewRow(tooltip)
-    tooltip.sessionETA = NewRow(tooltip)
     tooltip.questRows = {}
 
     local scroll = CreateFrame("ScrollFrame", nil, tooltip)
@@ -114,19 +140,15 @@ local function UpdateWidth(data, progressValue, questLabel, questTotal)
 
     Include("Current", progressValue)
     Include("Remaining", Value(data.remaining))
-    Include(questLabel, Value(questTotal))
-    Include("Rested bonus", Value(data.restedXP))
+    Include(questLabel, QuestXPValue(questTotal, data.questBonusXP))
+    Include("Rested bonus", RestedXPValue(data.restedXP, data.restedPercent))
     if data.questUnknownCount > 0 then
         Include("Rewards unavailable", tostring(data.questUnknownCount))
     end
-    Include("XP gained", dash)
-    Include("Elapsed", dash)
-    Include("XP/h", dash)
-    Include("Time to level", dash)
     needed = math.max(needed, MeasureText(string.format("Completed quests (%d)", data.questCount)) + 2 * padding)
 
     for _, quest in ipairs(data.quests) do
-        Include(quest.name or "Name unavailable", Value(quest.xp))
+        Include(quest.name or "Name unavailable", QuestXPValue(quest.xp, quest.bonusXP))
     end
 
     width = math.max(minimumWidth, math.ceil(needed) + 2)
@@ -146,7 +168,7 @@ local function PopulateQuests(data)
         end
         row.left:ClearAllPoints()
         row.left:SetPoint("TOPLEFT", tooltip.content, "TOPLEFT", 0, -y)
-        local reward = Value(quest.xp)
+        local reward = QuestXPValue(quest.xp, quest.bonusXP)
         local rewardWidth = math.ceil(MeasureText(reward)) + 1
         row.left:SetWidth(width - 2 * padding - rewardWidth - columnGap)
         row.left:Show()
@@ -181,16 +203,16 @@ local function Populate(entry)
     PlaceRow(tooltip.remaining, y, "Remaining", Value(data.remaining))
     y = y + rowHeight
 
-    PlaceRow(tooltip.questSummary, y, questLabel, Value(questTotal))
+    PlaceRow(tooltip.questSummary, y, questLabel, QuestXPValue(questTotal, data.questBonusXP))
     y = y + rowHeight
-    PlaceRow(tooltip.rested, y, "Rested bonus", Value(data.restedXP))
+    PlaceRow(tooltip.rested, y, "Rested bonus", RestedXPValue(data.restedXP, data.restedPercent))
     y = y + rowHeight + 3
 
     PlaceHeading(tooltip.questHeading, y, string.format("Completed quests (%d)", data.questCount))
     y = y + 15
     local questTop = y
     local questHeight = PopulateQuests(data)
-    local footerHeight = (data.questUnknownCount > 0 and rowHeight or 0) + 3 + 15 + 4 * rowHeight + padding
+    local footerHeight = (data.questUnknownCount > 0 and rowHeight or 0) + padding
     local above = UIParent:GetHeight() - (entry.bar:GetTop() or 0)
     local below = entry.bar:GetBottom() or 0
     local placeAbove = above >= below
@@ -215,19 +237,7 @@ local function Populate(entry)
         tooltip.unknown.right:Hide()
     end
 
-    y = y + 3
-    PlaceHeading(tooltip.sessionHeading, y, "This session")
-    y = y + 15
-    PlaceRow(tooltip.sessionXP, y, "XP gained", dash)
-    y = y + rowHeight
-    PlaceRow(tooltip.sessionTime, y, "Elapsed", dash)
-    y = y + rowHeight
-    PlaceRow(tooltip.sessionRate, y, "XP/h", dash)
-    y = y + rowHeight
-    PlaceRow(tooltip.sessionETA, y, "Time to level", dash)
-    y = y + rowHeight + padding
-
-    tooltip:SetHeight(y)
+    tooltip:SetHeight(y + padding)
     tooltip:ClearAllPoints()
     if placeAbove then
         tooltip:SetPoint("BOTTOMLEFT", entry.bar, "TOPLEFT", 0, -3)
