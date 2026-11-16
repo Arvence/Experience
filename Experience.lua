@@ -17,6 +17,11 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         end
     end
     addon.textSettings = ExperienceDB
+    if type(ExperienceDB.barOpacity) ~= "number" then
+        ExperienceDB.barOpacity = 100
+    end
+    ExperienceDB.barOpacity = math.max(0, math.min(100, math.floor(ExperienceDB.barOpacity + 0.5)))
+    addon.barOpacity = ExperienceDB.barOpacity
 
     local panel = CreateFrame("Frame")
     local category = Settings.RegisterCanvasLayoutCategory(panel, "Experience")
@@ -79,6 +84,37 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
     children[3] = AddToggle("showQuestXP", "Show Quest XP", 310, 18, true)
     children[4] = AddToggle("showRested", "Show Rested", 347, 18, true)
 
+    local display = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    display:SetPoint("TOPLEFT", panel, "TOPLEFT", 28, -400)
+    display:SetScale(1.12)
+    display:SetText("Display")
+
+    local opacitySetting = Settings.RegisterAddOnSetting(category, "EXPERIENCE_BAR_OPACITY", "barOpacity", ExperienceDB, Settings.VarType.Number, "Bar Opacity", 100)
+    local opacityLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    opacityLabel:SetPoint("TOPLEFT", display, "BOTTOMLEFT", 0, -15)
+    opacityLabel:SetScale(1.12)
+    local function UpdateOpacityLabel(value)
+        opacityLabel:SetText(string.format("Bar Opacity — %d%%", value))
+    end
+    UpdateOpacityLabel(opacitySetting:GetValue())
+
+    local opacityDescription = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    opacityDescription:SetPoint("TOPLEFT", opacityLabel, "BOTTOMLEFT", 0, -5)
+    opacityDescription:SetScale(1.12)
+    opacityDescription:SetText("Adjust the visibility of the Experience bar.")
+
+    local slider = CreateFrame("Slider", nil, panel, "MinimalSliderTemplate")
+    slider:SetPoint("TOPLEFT", opacityDescription, "BOTTOMLEFT", 0, -11)
+    slider:SetMinMaxValues(0, 100)
+    slider:SetValueStep(1)
+    slider:SetValue(opacitySetting:GetValue())
+    slider:SetScript("OnValueChanged", function(_, value)
+        value = math.floor(value + 0.5)
+        opacitySetting:SetValue(value)
+        UpdateOpacityLabel(value)
+        addon:SetBarOpacity(value)
+    end)
+
     local function UpdateControls()
         for _, control in ipairs(controls) do
             control.checkbox:SetChecked(control.setting:GetValue())
@@ -87,6 +123,10 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
             child:SetEnabled(master:GetChecked())
             child.Text:SetFontObject(master:GetChecked() and GameFontNormal or GameFontDisable)
         end
+        local value = opacitySetting:GetValue()
+        slider:SetValue(value)
+        UpdateOpacityLabel(value)
+        addon:SetBarOpacity(value)
     end
 
     panel.OnRefresh = function()
@@ -96,6 +136,7 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         for _, control in ipairs(controls) do
             control.setting:SetValueToDefault()
         end
+        opacitySetting:SetValueToDefault()
         UpdateControls()
         addon:RefreshBars()
     end

@@ -137,6 +137,7 @@ local function CreateEntry(container, native)
     local bar = CreateFrame("Frame", nil, native)
     bar:Hide()
     bar:SetIgnoreParentAlpha(true)
+    bar:SetAlpha((addon.barOpacity or 100) / 100)
     bar:SetFrameStrata(native.OverlayFrame:GetFrameStrata())
     bar:SetFrameLevel(math.max(native.OverlayFrame:GetFrameLevel(), native.ExhaustionTick:GetFrameLevel()) + 1)
     bar:SetPoint("BOTTOMLEFT", native.StatusBar, "BOTTOMLEFT", 0, -1.5)
@@ -306,6 +307,13 @@ end
 function addon:RefreshBars()
     for _, entry in ipairs(entries) do
         UpdateXP(entry)
+    end
+end
+
+function addon:SetBarOpacity(value)
+    self.barOpacity = value
+    for _, entry in ipairs(entries) do
+        entry.bar:SetAlpha(value / 100)
     end
 end
 
