@@ -6,6 +6,7 @@ local width = minimumWidth
 local padding = 8
 local rowHeight = 13
 local columnGap = 8
+local questNameWidth = 180
 local dash = "—"
 
 local function Value(value)
@@ -107,8 +108,10 @@ local function CreateTooltip()
     tooltip.measure = NewText(tooltip, "GameFontHighlightSmall")
     tooltip.measure:SetAlpha(0)
 
-    tooltip.experienceHeading = NewText(tooltip, "GameFontNormalSmall")
     tooltip.questHeading = NewText(tooltip, "GameFontNormalSmall")
+    tooltip.separator = tooltip:CreateTexture(nil, "ARTWORK")
+    tooltip.separator:SetColorTexture(0.28, 0.29, 0.31, 0.65)
+    tooltip.separator:SetHeight(1)
     tooltip.progress = NewRow(tooltip)
     tooltip.remaining = NewRow(tooltip)
     tooltip.questSummary = NewRow(tooltip)
@@ -134,8 +137,8 @@ end
 
 local function UpdateWidth(data, progressValue, questLabel, questTotal)
     local needed = 0
-    local function Include(label, value)
-        needed = math.max(needed, MeasureText(label) + MeasureText(value) + columnGap + 2 * padding)
+    local function Include(label, value, labelLimit)
+        needed = math.max(needed, math.min(MeasureText(label), labelLimit or math.huge) + MeasureText(value) + columnGap + 2 * padding)
     end
 
     Include("Current", progressValue)
@@ -148,7 +151,7 @@ local function UpdateWidth(data, progressValue, questLabel, questTotal)
     needed = math.max(needed, MeasureText(string.format("Completed quests (%d)", data.questCount)) + 2 * padding)
 
     for _, quest in ipairs(data.quests) do
-        Include(quest.name or "Name unavailable", QuestXPValue(quest.xp, quest.bonusXP))
+        Include(quest.name or "Name unavailable", QuestXPValue(quest.xp, quest.bonusXP), questNameWidth)
     end
 
     width = math.max(minimumWidth, math.ceil(needed) + 2)
@@ -164,6 +167,7 @@ local function PopulateQuests(data)
         if not row then
             row = NewRow(tooltip.content)
             row.left:SetTextColor(HIGHLIGHT_FONT_COLOR:GetRGB())
+            row.left:SetMaxLines(1)
             tooltip.questRows[index] = row
         end
         row.left:ClearAllPoints()
@@ -173,13 +177,12 @@ local function PopulateQuests(data)
         row.left:SetWidth(width - 2 * padding - rewardWidth - columnGap)
         row.left:Show()
         row.left:SetText(quest.name or "Name unavailable")
-        local height = math.max(rowHeight, math.ceil(row.left:GetStringHeight()))
         row.right:ClearAllPoints()
         row.right:SetPoint("TOPRIGHT", tooltip.content, "TOPRIGHT", 0, -y)
         row.right:SetWidth(rewardWidth)
         row.right:SetText(reward)
         row.right:Show()
-        y = y + height + 2
+        y = y + rowHeight + 2
     end
     for index = #data.quests + 1, #tooltip.questRows do
         tooltip.questRows[index].left:Hide()
@@ -196,8 +199,6 @@ local function Populate(entry)
     local questLabel = data.questPercentPartial and "Known quest XP" or "Completed quest XP"
     UpdateWidth(data, progressValue, questLabel, questTotal)
     local y = padding
-    PlaceHeading(tooltip.experienceHeading, y, "Experience")
-    y = y + 15
     PlaceRow(tooltip.progress, y, "Current", progressValue)
     y = y + rowHeight
     PlaceRow(tooltip.remaining, y, "Remaining", Value(data.remaining))
@@ -206,10 +207,14 @@ local function Populate(entry)
     PlaceRow(tooltip.questSummary, y, questLabel, QuestXPValue(questTotal, data.questBonusXP))
     y = y + rowHeight
     PlaceRow(tooltip.rested, y, "Rested bonus", RestedXPValue(data.restedXP, data.restedPercent))
-    y = y + rowHeight + 3
+    y = y + rowHeight + 2
 
+    tooltip.separator:ClearAllPoints()
+    tooltip.separator:SetPoint("TOPLEFT", tooltip, "TOPLEFT", padding, -y)
+    tooltip.separator:SetPoint("TOPRIGHT", tooltip, "TOPRIGHT", -padding, -y)
+    y = y + 5
     PlaceHeading(tooltip.questHeading, y, string.format("Completed quests (%d)", data.questCount))
-    y = y + 15
+    y = y + 14
     local questTop = y
     local questHeight = PopulateQuests(data)
     local footerHeight = (data.questUnknownCount > 0 and rowHeight or 0) + padding
@@ -240,7 +245,7 @@ local function Populate(entry)
     tooltip:SetHeight(y + padding)
     tooltip:ClearAllPoints()
     if placeAbove then
-        tooltip:SetPoint("BOTTOMLEFT", entry.bar, "TOPLEFT", 0, -3)
+        tooltip:SetPoint("BOTTOMLEFT", entry.bar, "TOPLEFT", 0, 0)
     else
         tooltip:SetPoint("TOPLEFT", entry.bar, "BOTTOMLEFT", 0, 3)
     end
