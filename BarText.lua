@@ -45,26 +45,27 @@ local function Segment(label, value, colored)
 end
 
 local function FormatLine(data, compact, colored)
-    local remaining = Number(data.remaining, compact)
-    if data.remaining ~= nil and data.maximum and data.maximum > 0 then
-        remaining = remaining .. " (" .. Percentage(data.remaining / data.maximum * 100) .. ")"
+    local settings = addon.textSettings
+    local parts = {}
+    if settings.showXP then
+        parts[#parts + 1] = Segment("XP", Number(data.current, compact) .. (compact and "/" or " / ") .. Number(data.maximum, compact), colored)
     end
-
-    local parts
-    if compact then
-        parts = {
-            Segment("XP", Number(data.current, true) .. "/" .. Number(data.maximum, true), colored),
-            Segment("Left", remaining, colored),
-            Segment("Quests", Percentage(data.questPercent) .. " - " .. ProjectedPercentage(data.questProjectedPercent), colored),
-            Segment("Rested", Percentage(data.restedPercent), colored),
-        }
-    else
-        parts = {
-            Segment("XP", Number(data.current) .. " / " .. Number(data.maximum), colored),
-            Segment("Left", remaining, colored),
-            Segment("Quests", Percentage(data.questPercent) .. " - " .. ProjectedPercentage(data.questProjectedPercent), colored),
-            Segment("Rested", Percentage(data.restedPercent), colored),
-        }
+    if settings.showLeft then
+        local remaining = Number(data.remaining, compact)
+        if data.remaining ~= nil and data.maximum and data.maximum > 0 then
+            remaining = remaining .. " (" .. Percentage(data.remaining / data.maximum * 100) .. ")"
+        end
+        parts[#parts + 1] = Segment("Left", remaining, colored)
+    end
+    if settings.showQuestXP then
+        local questValue = Percentage(data.questPercent)
+        if addon.wellRestedEnabled then
+            questValue = questValue .. " - " .. ProjectedPercentage(data.questProjectedPercent)
+        end
+        parts[#parts + 1] = Segment("Quests", questValue, colored)
+    end
+    if settings.showRested then
+        parts[#parts + 1] = Segment("Rested", Percentage(data.restedPercent), colored)
     end
     return table.concat(parts, colored and separatorColor:WrapTextInColorCode(separator) or separator)
 end
@@ -115,8 +116,10 @@ function addon:UpdateBarText(entry)
         return
     end
     local data = self.xpData
-    if not data.current or not data.maximum then
+    if not data.current or not data.maximum or not addon.textSettings.showBarText then
         entry.textPlain = ""
+        entry.textMeasuredWidth = 0
+        entry.textFit = true
         entry.text:SetText("")
         return
     end
@@ -125,6 +128,13 @@ function addon:UpdateBarText(entry)
     local nativeSize = entry.textSize
     local measure = entry.textMeasure
     local chosen = FormatLine(data, false)
+    if chosen == "" then
+        entry.textPlain = ""
+        entry.textMeasuredWidth = 0
+        entry.textFit = true
+        entry.text:SetText("")
+        return
+    end
     local compact = false
     local fontSize = nativeSize
     measure:SetFont(entry.textFont, fontSize, entry.textFlags)

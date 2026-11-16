@@ -83,7 +83,9 @@ local function UpdateSegments(entry)
     local data = addon.xpData
     if not data.current or not data.maximum then
         entry.questPreview:Hide()
-        entry.questBonusPreview:Hide()
+        if entry.questBonusPreview then
+            entry.questBonusPreview:Hide()
+        end
         entry.restedPreview:Hide()
         return
     end
@@ -93,12 +95,14 @@ local function UpdateSegments(entry)
     local available = maximum - current
     local quest = math.min(data.questKnownXP or 0, available)
     local afterQuest = available - quest
-    local questBonus = math.min(data.questKnownBonusXP or 0, afterQuest)
+    local questBonus = addon.wellRestedEnabled and math.min(data.questKnownBonusXP or 0, afterQuest) or 0
     local rested = math.min(data.restedXP or 0, afterQuest - questBonus)
     local width = entry.fill:GetWidth()
 
     PlaceSegment(entry.questPreview, entry.fill, current, quest, maximum, width)
-    PlaceSegment(entry.questBonusPreview, entry.fill, current + quest, questBonus, maximum, width)
+    if entry.questBonusPreview then
+        PlaceSegment(entry.questBonusPreview, entry.fill, current + quest, questBonus, maximum, width)
+    end
     PlaceSegment(entry.restedPreview, entry.fill, current + quest + questBonus, rested, maximum, width)
 end
 
@@ -180,11 +184,14 @@ local function CreateEntry(container, native)
     questPreview:AddMaskTexture(fillMask)
     questPreview:Hide()
 
-    local questBonusPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
-    questBonusPreview:SetTexture(fillTexture)
-    questBonusPreview:SetVertexColor(0.611765, 0.458824, 0.094118, 1)
-    questBonusPreview:AddMaskTexture(fillMask)
-    questBonusPreview:Hide()
+    local questBonusPreview
+    if addon.wellRestedEnabled then
+        questBonusPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
+        questBonusPreview:SetTexture(fillTexture)
+        questBonusPreview:SetVertexColor(0.611765, 0.458824, 0.094118, 1)
+        questBonusPreview:AddMaskTexture(fillMask)
+        questBonusPreview:Hide()
+    end
 
     local restedPreview = fill:CreateTexture(nil, "ARTWORK", nil, 1)
     restedPreview:SetTexture(fillTexture)

@@ -30,6 +30,9 @@ local function QuestXPValue(xp, bonusXP)
     if xp == nil then
         return dash
     end
+    if not addon.wellRestedEnabled then
+        return Value(xp) .. " XP"
+    end
     return Value(xp) .. " XP (|cff9c7518+" .. BonusValue(bonusXP or 0) .. " XP|r)"
 end
 
