@@ -3,9 +3,9 @@ local tooltip
 local owner
 local minimumWidth = 260
 local width = minimumWidth
-local padding = 8
-local rowHeight = 13
-local columnGap = 8
+local padding = 10
+local rowHeight = 15
+local columnGap = 10
 local questNameWidth = 180
 local dash = "—"
 
@@ -49,6 +49,8 @@ end
 
 local function NewText(parent, template, justify)
     local text = parent:CreateFontString(nil, "OVERLAY", template)
+    local font, size, flags = text:GetFont()
+    text:SetFont(font, size + 1, flags)
     text:SetJustifyH(justify or "LEFT")
     text:SetJustifyV("TOP")
     text:SetWordWrap(false)
@@ -185,7 +187,7 @@ local function PopulateQuests(data)
         row.right:SetWidth(rewardWidth)
         row.right:SetText(reward)
         row.right:Show()
-        y = y + rowHeight + 2
+        y = y + rowHeight + 3
     end
     for index = #data.quests + 1, #tooltip.questRows do
         tooltip.questRows[index].left:Hide()
@@ -217,7 +219,7 @@ local function Populate(entry)
     tooltip.separator:SetPoint("TOPRIGHT", tooltip, "TOPRIGHT", -padding, -y)
     y = y + 5
     PlaceHeading(tooltip.questHeading, y, string.format("Completed quests (%d)", data.questCount))
-    y = y + 14
+    y = y + 16
     local questTop = y
     local questHeight = PopulateQuests(data)
     local footerHeight = (data.questUnknownCount > 0 and rowHeight or 0) + padding
