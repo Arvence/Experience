@@ -149,19 +149,35 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
     UpdateControls()
     Settings.RegisterAddOnCategory(category)
 
+    local function OpenSettings()
+        if SettingsPanel and SettingsPanel:IsShown() and SettingsPanel:GetCurrentCategory() == category then
+            return
+        end
+        Settings.OpenToCategory(category:GetID())
+    end
+
+    SLASH_EXP1 = "/exp"
+    SlashCmdList.EXP = OpenSettings
+
     SLASH_EXPERIENCE1 = "/experience"
     SlashCmdList.EXPERIENCE = function(message)
-        if message:lower():match("^%s*bar%s*$") then
+        local command = (message or ""):lower():match("^%s*%-c%s*(.-)%s*$")
+        if not command then
+            OpenSettings()
+            return
+        end
+
+        if command == "bar" then
             addon:PrintBarStatus()
             return
         end
 
-        if message:lower():match("^%s*data%s*$") then
+        if command == "data" then
             addon:PrintDataStatus()
             return
         end
 
-        if message:lower():match("^%s*text%s*$") then
+        if command == "text" then
             addon:PrintTextStatus()
             return
         end
@@ -169,6 +185,9 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         local version, build, _, interfaceVersion = GetBuildInfo()
         print(string.format("%s: bootstrap loaded. Client %s (build %s), interface %s.", addonName, version, build, tostring(interfaceVersion)))
     end
+
+    local version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+    DEFAULT_CHAT_FRAME:AddMessage(string.format("|cffffd100Experience|r || v%s || Settings: /exp || XP/h & Level ETA enabled.", version))
 
     self:UnregisterEvent("ADDON_LOADED")
 end)
