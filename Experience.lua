@@ -11,7 +11,7 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         ExperienceDB.wellRestedCalculator = true
     end
     addon.wellRestedEnabled = ExperienceDB.wellRestedCalculator
-    for _, key in ipairs({ "showBarText", "showXP", "showLeft", "showQuestXP", "showRested" }) do
+    for _, key in ipairs({ "showBarText", "showXP", "showLeft", "showQuestXP", "showRested", "showXPPerHour", "showLevelETA" }) do
         if ExperienceDB[key] == nil then
             ExperienceDB[key] = true
         end
@@ -56,7 +56,7 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
                         child.Text:SetFontObject(self:GetChecked() and GameFontNormal or GameFontDisable)
                     end
                 end
-                addon:RefreshBars()
+                addon:RefreshBarText()
             end
         end)
         controls[#controls + 1] = { setting = setting, checkbox = checkbox }
@@ -75,17 +75,23 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
     reload:SetText("Reload Required")
 
     local master = AddToggle("showBarText", "Show Experience Bar Text", 178, 0, true)
+    master.Text:SetScale(1.04)
     local textDescription = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     textDescription:SetPoint("TOPLEFT", master.Text, "BOTTOMLEFT", 0, -5)
-    textDescription:SetScale(1.12)
+    textDescription:SetScale(1.04)
     textDescription:SetText("Display experience information directly on the XP bar.")
-    children[1] = AddToggle("showXP", "Show XP", 236, 18, true)
-    children[2] = AddToggle("showLeft", "Show Left", 273, 18, true)
-    children[3] = AddToggle("showQuestXP", "Show Quest XP", 310, 18, true)
-    children[4] = AddToggle("showRested", "Show Rested", 347, 18, true)
+    children[1] = AddToggle("showXP", "Show XP", 226, 18, true)
+    children[2] = AddToggle("showLeft", "Show Left", 258, 18, true)
+    children[3] = AddToggle("showQuestXP", "Show Quest XP", 290, 18, true)
+    children[4] = AddToggle("showRested", "Show Rested", 322, 18, true)
+    children[5] = AddToggle("showXPPerHour", "Show XP/h", 354, 18, true)
+    children[6] = AddToggle("showLevelETA", "Show Level in", 386, 18, true)
+    for _, child in ipairs(children) do
+        child.Text:SetScale(1.04)
+    end
 
     local display = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    display:SetPoint("TOPLEFT", panel, "TOPLEFT", 28, -400)
+    display:SetPoint("TOPLEFT", panel, "TOPLEFT", 28, -428)
     display:SetScale(1.12)
     display:SetText("Display")
 

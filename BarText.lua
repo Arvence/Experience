@@ -37,6 +37,23 @@ local function ProjectedPercentage(value)
     return string.format("%.2f%%", value)
 end
 
+local function Rate(value)
+    if value >= 1000 then
+        return string.format("%.1fK", value / 1000)
+    end
+    return BreakUpLargeNumbers(math.floor(value + 0.5))
+end
+
+local function Duration(seconds)
+    local minutes = math.ceil(seconds / 60)
+    local hours = math.floor(minutes / 60)
+    if hours > 0 then
+        local remainder = minutes % 60
+        return remainder > 0 and string.format("%dh %dm", hours, remainder) or string.format("%dh", hours)
+    end
+    return string.format("%dm", minutes)
+end
+
 local function Segment(label, value, colored)
     if colored then
         return labelColor:WrapTextInColorCode(label) .. " " .. valueColor:WrapTextInColorCode(value)
@@ -66,6 +83,12 @@ local function FormatLine(data, compact, colored)
     end
     if settings.showRested then
         parts[#parts + 1] = Segment("Rested", Percentage(data.restedPercent), colored)
+    end
+    if settings.showXPPerHour and data.xpPerHour and data.xpPerHour > 0 then
+        parts[#parts + 1] = Segment("XP/h", Rate(data.xpPerHour), colored)
+    end
+    if settings.showLevelETA and data.levelETA and data.levelETA > 0 then
+        parts[#parts + 1] = Segment("Level in", Duration(data.levelETA), colored)
     end
     return table.concat(parts, colored and separatorColor:WrapTextInColorCode(separator) or separator)
 end
