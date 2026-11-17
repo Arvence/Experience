@@ -1,5 +1,124 @@
 local _, addon = ...
 local events = CreateFrame("Frame")
+local rateRecord
+local lastTick
+local wasAFK
+local rateTicker
+local levelCheckQueued
+local QueueLevelObservation
+
+local function PlayerIsAFK()
+    return type(UnitIsAFK) ~= "function" or UnitIsAFK("player")
+end
+
+local function AdvanceActiveTime()
+    if not rateRecord or not lastTick then
+        return
+    end
+    local now = GetTime()
+    local elapsed = now - lastTick
+    if not wasAFK and elapsed > 0 and elapsed <= 90 then
+        rateRecord.active = rateRecord.active + elapsed
+    end
+    lastTick = now
+    rateRecord.lastSeen = time()
+end
+
+local function UpdateRate()
+    local data = addon.xpData
+    local level = UnitLevel("player")
+    local maxLevel = GameRulesUtil.GetEffectiveMaxLevelForPlayer()
+    if not rateRecord or wasAFK or not data.maximum or issecretvalue(level) or issecretvalue(maxLevel) or type(level) ~= "number" or type(maxLevel) ~= "number" or level >= maxLevel or rateRecord.active < 600 or rateRecord.gains < 2 or rateRecord.earned <= 0 then
+        data.xpPerHour = nil
+        data.levelETA = nil
+        return
+    end
+    data.xpPerHour = rateRecord.earned * 3600 / rateRecord.active
+    data.levelETA = data.remaining and data.remaining * 3600 / data.xpPerHour or nil
+end
+
+local function ObserveEarnedXP(settled)
+    if not rateRecord then
+        return
+    end
+    local level = UnitLevel("player")
+    local current = UnitXP("player")
+    local maximum = UnitXPMax("player")
+    if issecretvalue(level) or issecretvalue(current) or issecretvalue(maximum) or type(level) ~= "number" or type(current) ~= "number" or type(maximum) ~= "number" or maximum <= 0 then
+        return
+    end
+    if level ~= rateRecord.level and not settled then
+        QueueLevelObservation()
+        return
+    end
+    local gained = 0
+    if level == rateRecord.level and current >= rateRecord.xp then
+        gained = current - rateRecord.xp
+    elseif level == rateRecord.level + 1 then
+        gained = math.max(0, rateRecord.maximum - rateRecord.xp) + current
+    elseif level == rateRecord.level and current < rateRecord.xp then
+        return
+    end
+    if gained > 0 then
+        rateRecord.earned = rateRecord.earned + gained
+        rateRecord.gains = rateRecord.gains + 1
+    end
+    rateRecord.level = level
+    rateRecord.xp = current
+    rateRecord.maximum = maximum
+    rateRecord.lastSeen = time()
+    UpdateRate()
+end
+
+QueueLevelObservation = function()
+    if levelCheckQueued then
+        return
+    end
+    levelCheckQueued = true
+    C_Timer.After(0, function()
+        levelCheckQueued = nil
+        addon:RefreshProgressData()
+        ObserveEarnedXP(true)
+        if addon.RefreshBars then
+            addon:RefreshBars()
+        end
+    end)
+end
+
+local function StartRateTracking()
+    local guid = UnitGUID("player")
+    if not guid then
+        return
+    end
+    ExperienceDB.xpRates = ExperienceDB.xpRates or {}
+    local record = ExperienceDB.xpRates[guid]
+    local now = time()
+    if not record or type(record.lastSeen) ~= "number" or now < record.lastSeen or now - record.lastSeen > 86400 then
+        record = { earned = 0, active = 0, gains = 0 }
+        ExperienceDB.xpRates[guid] = record
+    end
+    rateRecord = record
+    rateRecord.level = UnitLevel("player")
+    rateRecord.xp = UnitXP("player")
+    rateRecord.maximum = UnitXPMax("player")
+    rateRecord.lastSeen = now
+    lastTick = GetTime()
+    wasAFK = PlayerIsAFK()
+    UpdateRate()
+    if not rateTicker then
+        rateTicker = C_Timer.NewTicker(45, function()
+            if PlayerIsAFK() and not wasAFK then
+                wasAFK = true
+            end
+            AdvanceActiveTime()
+            wasAFK = PlayerIsAFK()
+            UpdateRate()
+            if addon.RefreshBarText then
+                addon:RefreshBarText()
+            end
+        end)
+    end
+end
 
 addon.xpData = {
     quests = {},
@@ -149,6 +268,9 @@ function addon:PrintDataStatus()
     local logState = data.questLogComplete and "complete" or "partial"
 
     print(string.format("Experience: XP %s / %s, remaining %s, rested bonus %s.", current, maximum, data.remaining and tostring(data.remaining) or "unavailable", rested))
+    if rateRecord then
+        print(string.format("Experience: earned XP %d, active time %dm, XP/h %s, level ETA %s.", rateRecord.earned, math.floor(rateRecord.active / 60), data.xpPerHour and string.format("%.0f", data.xpPerHour) or "unavailable", data.levelETA and string.format("%.0fs", data.levelETA) or "unavailable"))
+    end
     if self.wellRestedEnabled then
         local questBonusTotal = data.questBonusXP and tostring(data.questBonusXP) or "unavailable"
         print(string.format("Experience: completed quests %d observed, known XP %d from %d, bonus XP %s, unknown rewards %d, quest preview XP %s, log %s.", data.questCount, data.questKnownXP, data.questKnownCount, questBonusTotal, data.questUnknownCount, questTotal, logState))
@@ -175,6 +297,34 @@ events:SetScript("OnEvent", function(_, event, questID, success)
         addon:RefreshProgressData()
     end
 
+    if event == "PLAYER_ENTERING_WORLD" then
+        if not rateRecord then
+            StartRateTracking()
+        else
+            lastTick = GetTime()
+            wasAFK = PlayerIsAFK()
+        end
+    elseif event == "PLAYER_XP_UPDATE" then
+        AdvanceActiveTime()
+        ObserveEarnedXP()
+    elseif event == "PLAYER_LEVEL_UP" then
+        QueueLevelObservation()
+    elseif event == "PLAYER_FLAGS_CHANGED" and questID == "player" then
+        AdvanceActiveTime()
+        wasAFK = PlayerIsAFK()
+        UpdateRate()
+    elseif event == "PLAYER_FLAGS_CHANGED" then
+        return
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        AdvanceActiveTime()
+        lastTick = nil
+    elseif event == "PLAYER_LOGOUT" then
+        AdvanceActiveTime()
+        rateRecord = nil
+        lastTick = nil
+        return
+    end
+
     if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LEVEL_UP" or event == "QUEST_LOG_UPDATE" or event == "QUEST_ACCEPTED" or event == "QUEST_REMOVED" or event == "QUEST_TURNED_IN" or event == "QUEST_DATA_LOAD_RESULT" then
         addon:RefreshQuestData()
     end
@@ -194,3 +344,6 @@ events:RegisterEvent("QUEST_ACCEPTED")
 events:RegisterEvent("QUEST_REMOVED")
 events:RegisterEvent("QUEST_TURNED_IN")
 events:RegisterEvent("QUEST_DATA_LOAD_RESULT")
+events:RegisterEvent("PLAYER_FLAGS_CHANGED")
+events:RegisterEvent("PLAYER_LEAVING_WORLD")
+events:RegisterEvent("PLAYER_LOGOUT")

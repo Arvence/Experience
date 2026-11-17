@@ -310,6 +310,12 @@ function addon:RefreshBars()
     end
 end
 
+function addon:RefreshBarText()
+    for _, entry in ipairs(entries) do
+        self:UpdateBarText(entry)
+    end
+end
+
 function addon:SetBarOpacity(value)
     self.barOpacity = value
     for _, entry in ipairs(entries) do
