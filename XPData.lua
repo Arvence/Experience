@@ -86,6 +86,9 @@ QueueLevelObservation = function()
 end
 
 local function StartRateTracking()
+    if not addon.xpTrackerEnabled then
+        return
+    end
     local guid = UnitGUID("player")
     if not guid then
         return
@@ -105,6 +108,9 @@ local function StartRateTracking()
     lastTick = GetTime()
     wasAFK = PlayerIsAFK()
     UpdateRate()
+    events:RegisterEvent("PLAYER_FLAGS_CHANGED")
+    events:RegisterEvent("PLAYER_LEAVING_WORLD")
+    events:RegisterEvent("PLAYER_LOGOUT")
     if not rateTicker then
         rateTicker = C_Timer.NewTicker(45, function()
             if PlayerIsAFK() and not wasAFK then
@@ -304,10 +310,10 @@ events:SetScript("OnEvent", function(_, event, questID, success)
             lastTick = GetTime()
             wasAFK = PlayerIsAFK()
         end
-    elseif event == "PLAYER_XP_UPDATE" then
+    elseif event == "PLAYER_XP_UPDATE" and addon.xpTrackerEnabled then
         AdvanceActiveTime()
         ObserveEarnedXP()
-    elseif event == "PLAYER_LEVEL_UP" then
+    elseif event == "PLAYER_LEVEL_UP" and addon.xpTrackerEnabled then
         QueueLevelObservation()
     elseif event == "PLAYER_FLAGS_CHANGED" and questID == "player" then
         AdvanceActiveTime()
@@ -344,6 +350,3 @@ events:RegisterEvent("QUEST_ACCEPTED")
 events:RegisterEvent("QUEST_REMOVED")
 events:RegisterEvent("QUEST_TURNED_IN")
 events:RegisterEvent("QUEST_DATA_LOAD_RESULT")
-events:RegisterEvent("PLAYER_FLAGS_CHANGED")
-events:RegisterEvent("PLAYER_LEAVING_WORLD")
-events:RegisterEvent("PLAYER_LOGOUT")

@@ -11,6 +11,10 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         ExperienceDB.wellRestedCalculator = true
     end
     addon.wellRestedEnabled = ExperienceDB.wellRestedCalculator
+    if ExperienceDB.xpTracker == nil then
+        ExperienceDB.xpTracker = true
+    end
+    addon.xpTrackerEnabled = ExperienceDB.xpTracker
     for _, key in ipairs({ "showBarText", "showXP", "showLeft", "showQuestXP", "showRested", "showXPPerHour", "showLevelETA" }) do
         if ExperienceDB[key] == nil then
             ExperienceDB[key] = true
@@ -39,6 +43,7 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
 
     local controls = {}
     local children = {}
+    local UpdateChildStates
     local function AddToggle(key, label, y, indent, refreshText)
         local setting = Settings.RegisterAddOnSetting(category, "EXPERIENCE_" .. key:upper(), key, ExperienceDB, Settings.VarType.Boolean, label, true)
         local checkbox = CreateFrame("CheckButton", nil, panel, "CheckboxWithLabelTemplate")
@@ -49,13 +54,10 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         checkbox.Text:SetText(label)
         checkbox:SetScript("OnClick", function(self)
             setting:SetValue(self:GetChecked())
+            if key == "showBarText" or key == "xpTracker" then
+                UpdateChildStates()
+            end
             if refreshText then
-                if key == "showBarText" then
-                    for _, child in ipairs(children) do
-                        child:SetEnabled(self:GetChecked())
-                        child.Text:SetFontObject(self:GetChecked() and GameFontNormal or GameFontDisable)
-                    end
-                end
                 addon:RefreshBarText()
             end
         end)
@@ -74,24 +76,30 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
     reload:SetScale(1.12)
     reload:SetText("Reload Required")
 
-    local master = AddToggle("showBarText", "Show Experience Bar Text", 178, 0, true)
+    local tracker = AddToggle("xpTracker", "XP Tracker", 157, 0, false)
+    local trackerReload = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableTiny")
+    trackerReload:SetPoint("TOPLEFT", tracker.Text, "BOTTOMLEFT", 0, -3)
+    trackerReload:SetScale(1.12)
+    trackerReload:SetText("Reload Required")
+
+    local master = AddToggle("showBarText", "Show Experience Bar Text", 207, 0, true)
     master.Text:SetScale(1.04)
     local textDescription = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     textDescription:SetPoint("TOPLEFT", master.Text, "BOTTOMLEFT", 0, -5)
     textDescription:SetScale(1.04)
     textDescription:SetText("Display experience information directly on the XP bar.")
-    children[1] = AddToggle("showXP", "Show XP", 226, 18, true)
-    children[2] = AddToggle("showLeft", "Show Left", 258, 18, true)
-    children[3] = AddToggle("showQuestXP", "Show Quest XP", 290, 18, true)
-    children[4] = AddToggle("showRested", "Show Rested", 322, 18, true)
-    children[5] = AddToggle("showXPPerHour", "Show XP/h", 354, 18, true)
-    children[6] = AddToggle("showLevelETA", "Show Level in", 386, 18, true)
+    children[1] = AddToggle("showXP", "Show XP", 255, 18, true)
+    children[2] = AddToggle("showLeft", "Show Left", 287, 18, true)
+    children[3] = AddToggle("showQuestXP", "Show Quest XP", 319, 18, true)
+    children[4] = AddToggle("showRested", "Show Rested", 351, 18, true)
+    children[5] = AddToggle("showXPPerHour", "Show XP/h", 383, 18, true)
+    children[6] = AddToggle("showLevelETA", "Show Level in", 415, 18, true)
     for _, child in ipairs(children) do
         child.Text:SetScale(1.04)
     end
 
     local display = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    display:SetPoint("TOPLEFT", panel, "TOPLEFT", 28, -428)
+    display:SetPoint("TOPLEFT", panel, "TOPLEFT", 28, -457)
     display:SetScale(1.12)
     display:SetText("Display")
 
@@ -121,14 +129,19 @@ frame:SetScript("OnEvent", function(self, _, loadedAddonName)
         addon:SetBarOpacity(value)
     end)
 
+    UpdateChildStates = function()
+        for index, child in ipairs(children) do
+            local enabled = master:GetChecked() and (index <= 4 or tracker:GetChecked())
+            child:SetEnabled(enabled)
+            child.Text:SetFontObject(enabled and GameFontNormal or GameFontDisable)
+        end
+    end
+
     local function UpdateControls()
         for _, control in ipairs(controls) do
             control.checkbox:SetChecked(control.setting:GetValue())
         end
-        for _, child in ipairs(children) do
-            child:SetEnabled(master:GetChecked())
-            child.Text:SetFontObject(master:GetChecked() and GameFontNormal or GameFontDisable)
-        end
+        UpdateChildStates()
         local value = opacitySetting:GetValue()
         slider:SetValue(value)
         UpdateOpacityLabel(value)
