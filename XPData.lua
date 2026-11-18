@@ -8,7 +8,14 @@ local levelCheckQueued
 local QueueLevelObservation
 
 local function PlayerIsAFK()
-    return type(UnitIsAFK) ~= "function" or UnitIsAFK("player")
+    if type(UnitIsAFK) ~= "function" then
+        return wasAFK ~= false
+    end
+    local afk = UnitIsAFK("player")
+    if issecretvalue(afk) then
+        return wasAFK ~= false
+    end
+    return afk == true
 end
 
 local function AdvanceActiveTime()
@@ -90,7 +97,7 @@ local function StartRateTracking()
         return
     end
     local guid = UnitGUID("player")
-    if not guid then
+    if issecretvalue(guid) or not guid then
         return
     end
     ExperienceDB.xpRates = ExperienceDB.xpRates or {}
@@ -113,11 +120,12 @@ local function StartRateTracking()
     events:RegisterEvent("PLAYER_LOGOUT")
     if not rateTicker then
         rateTicker = C_Timer.NewTicker(45, function()
-            if PlayerIsAFK() and not wasAFK then
+            local afk = PlayerIsAFK()
+            if afk and not wasAFK then
                 wasAFK = true
             end
             AdvanceActiveTime()
-            wasAFK = PlayerIsAFK()
+            wasAFK = afk
             UpdateRate()
             if addon.RefreshBarText then
                 addon:RefreshBarText()
@@ -158,7 +166,9 @@ function addon:RefreshProgressData()
     end
 
     local rested = GetXPExhaustion()
-    if rested == nil then
+    if issecretvalue(rested) then
+        data.restedXP = nil
+    elseif rested == nil then
         data.restedXP = 0
     elseif IsNumber(rested) and rested >= 0 then
         data.restedXP = rested
@@ -192,7 +202,7 @@ function addon:RefreshQuestData()
         else
             for index = 1, shownEntries do
                 local info = C_QuestLog.GetInfo(index)
-                if not info or issecretvalue(info) or type(info) ~= "table" or issecretvalue(info.isHeader) then
+                if issecretvalue(info) or not info or type(info) ~= "table" or issecretvalue(info.isHeader) then
                     complete = false
                 elseif not info.isHeader then
                     observed = observed + 1
@@ -295,7 +305,7 @@ function addon:PrintDataStatus()
 end
 
 events:SetScript("OnEvent", function(_, event, questID, success)
-    if event == "QUEST_DATA_LOAD_RESULT" and (not success or not addon.xpData.unknownQuestIDs[questID]) then
+    if event == "QUEST_DATA_LOAD_RESULT" and (issecretvalue(success) or issecretvalue(questID) or not success or not addon.xpData.unknownQuestIDs[questID]) then
         return
     end
 
@@ -315,7 +325,7 @@ events:SetScript("OnEvent", function(_, event, questID, success)
         ObserveEarnedXP()
     elseif event == "PLAYER_LEVEL_UP" and addon.xpTrackerEnabled then
         QueueLevelObservation()
-    elseif event == "PLAYER_FLAGS_CHANGED" and questID == "player" then
+    elseif event == "PLAYER_FLAGS_CHANGED" and not issecretvalue(questID) and questID == "player" then
         AdvanceActiveTime()
         wasAFK = PlayerIsAFK()
         UpdateRate()
