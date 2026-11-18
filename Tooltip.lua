@@ -89,12 +89,14 @@ local function PlaceHeading(heading, y, title)
 end
 
 local function CanKeepOpen()
-    return owner and owner.bar:IsMouseOver() or tooltip:IsMouseOver()
+    return (owner and owner.bar and owner.bar:IsMouseOver()) or (tooltip and tooltip:IsMouseOver()) or false
 end
 
 local function HideIfOutside()
     if not CanKeepOpen() then
-        tooltip:Hide()
+        if tooltip then
+            tooltip:Hide()
+        end
         owner = nil
     end
 end
@@ -258,6 +260,11 @@ end
 
 function addon:AttachTooltip(entry)
     entry.bar:SetScript("OnEnter", function()
+        local cursorType = GetCursorInfo()
+        if issecretvalue(cursorType) or cursorType ~= nil then
+            addon:HideTooltip(owner)
+            return
+        end
         if not tooltip then
             CreateTooltip()
         end
