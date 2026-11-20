@@ -88,17 +88,18 @@ local function PlaceHeading(heading, y, title)
     heading:SetText(title)
 end
 
-local function CanKeepOpen()
-    return (owner and owner.bar and owner.bar:IsMouseOver()) or (tooltip and tooltip:IsMouseOver()) or false
-end
-
-local function HideIfOutside()
-    if not CanKeepOpen() then
-        if tooltip then
-            tooltip:Hide()
+local function HideIfOutside(frame)
+    if frame == tooltip then
+        if owner and owner.bar and owner.bar:IsMouseOver() then
+            return
         end
-        owner = nil
+    elseif tooltip and tooltip:IsMouseOver() then
+        return
     end
+    if tooltip then
+        tooltip:Hide()
+    end
+    owner = nil
 end
 
 local function CreateTooltip()
